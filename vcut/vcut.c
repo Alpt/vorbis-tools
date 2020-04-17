@@ -54,6 +54,9 @@
 #endif
 #endif
 
+double firstCuttime = 0;
+char *firstFilename = 0;
+
 static void clear_packet(vcut_packet *p)
 {
 	if(p->packet)
@@ -291,6 +294,8 @@ int main(int argc, char **argv)
 	seg->next = NULL;
 	state.next_segment = seg;
 
+    firstFilename = seg->filename;
+
 	if(strchr(argv[4], '+') != NULL) {
 	  if(sscanf(argv[4], "%lf", &seg->cuttime) != 1) {
 	    fprintf(stderr, _("Couldn't parse cutpoint \"%s\"\n"), argv[4]);
@@ -302,6 +307,7 @@ int main(int argc, char **argv)
 	}
 
 	if(seg->cuttime >= 0) {
+        firstCuttime = seg->cuttime;
 		printf(_("Processing: Cutting at %lf seconds\n"), seg->cuttime);
 	} else {
 		printf(_("Processing: Cutting at %lld samples\n"),
@@ -323,6 +329,14 @@ int main(int argc, char **argv)
 	fclose(state.in);
 
 	return ret;
+}
+
+int filenameCount = 0;
+char *new_filename(char *filename) {
+    char *newf = malloc(strlen(firstFilename) + 5 + 1);
+    sprintf(newf, "%s-%04d", firstFilename, filenameCount++);
+    printf("%s\n", newf);
+    return newf;
 }
 
 /* Returns 0 for success, or -1 on failure. */
@@ -437,7 +451,14 @@ int process_audio_packet(vcut_state *s,
 		packet->e_o_s = cut_on_eos;
 
 		s->output_filename = segment->filename;
-		s->next_segment = segment->next;
+
+        vcut_segment *seg = vcut_malloc(sizeof(vcut_segment));
+        seg->cuttime = segment->cuttime + firstCuttime;
+        seg->filename = new_filename(segment->filename);
+        seg->next = NULL;
+
+		s->next_segment = seg;
+
 		free(segment);
 		segment = NULL;
 
